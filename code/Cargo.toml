@@ -28,8 +28,7 @@ hmac = "0.12.1"
 sha2 = "0.10.8"
 url = "2.5.3"
 chrono = "0.4.38"
-#ap33772s-driver = { path = "../ap33772s-driver", features = ["std"] }
-ap33772s-driver = { version = "0.1.1", features = ["std"] }
+ap33772s-driver = { version = "0.1", features = ["std"] }
 # Removed syslog dependency as we're using a custom implementation
 
 [build-dependencies]

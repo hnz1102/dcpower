@@ -5,9 +5,14 @@
   </p>
 </div>
 
-# DC Power Unit for Breadboard
+# DC Power Unit for Breadboard (Under Development)
 
 This is a DC Power Unit for Breadboard based on ESP32-S3 microcontroller and AP33772S USB Power Delivery (PD) Sink Controller. It can supply power to the breadboard from USB Power Delivery (PD) Charger with support for both Standard Power Range (SPR) and Extended Power Range (EPR) modes. The output voltage can be controlled from 0v to 20V in SPR mode and up to 48V in EPR mode with step of 10mV.   
+There are 2 types of adopters for the output terminal: Single positive power output terminal and dual positive/negative output terminal. It is easy to connect to the breadboard with standard 2.54mm pitch pin header. If you select the dual positive/negative output terminal adopter, the output voltage can be halved by positive and negative voltage. E.g. If you set the output voltage to 20V, you can get +10V and -10V from the positive and negative output terminal.
+
+![adopter](doc/adaptor-s.jpg)
+
+The left image shows the single positive output terminal adopter, and the right image shows the dual positive/negative output terminal adopter.
 
 ## Key Features
 
@@ -31,6 +36,8 @@ This is a DC Power Unit for Breadboard based on ESP32-S3 microcontroller and AP3
 - **SSD1331**: Color OLED display (96x64 pixels)
 - **Touch Interface**: Capacitive touch sensors for user interaction
 - **MOSFET Load Circuit**: Electronic load for testing and regulation
+
+![board](doc/dcpowerunit_board.jpg)
 
 ## Software Architecture
 
@@ -214,23 +221,16 @@ After flashing the firmware, the console shows the booting messages and system i
 - Touch interface activation
 - OLED display initialization
 ```bash
-[2024-11-24T08:43:44Z INFO ] 🚀 A new version of cargo-espflash is available: v3.2.0
-[2024-11-24T08:43:44Z INFO ] Serial port: '/dev/ttyACM0'
-[2024-11-24T08:43:44Z INFO ] Connecting...
-[2024-11-24T08:43:44Z INFO ] Using flash stub
-Finished `release` profile [optimized] target(s) in 0.19s
-Chip type:         esp32s3 (revision v0.1)
+Chip type:         esp32s3 (revision v0.2)
 Crystal frequency: 40 MHz
 Flash size:        16MB
-Features:          WiFi, BLE
-MAC address:       xx:xx:xx:xx:xx:xx
-Bootloader:        /esp32/electricload/code/target/xtensa-esp32s3-espidf/release/build/esp-idf-sys-37f4c3bc37bda4bb/out/build/bootloader/bootloader.bin
-Partition table:   partitions.csv
-App/part. size:    1,358,304/15,728,640 bytes, 8.64%
-[2024-11-24T08:43:45Z INFO ] Segment at address '0x0' has not changed, skipping write
-[2024-11-24T08:43:45Z INFO ] Segment at address '0x8000' has not changed, skipping write
-[2024-11-24T08:43:46Z INFO ] Segment at address '0x10000' has not changed, skipping write
-[2024-11-24T08:43:46Z INFO ] Flashing has completed!
+Features:          WiFi, BLE, Embedded Flash
+MAC address:       80:65:99:b8:8e:90
+App/part. size:    1,383,760/1,536,000 bytes, 90.09%
+[00:00:00] [========================================]      14/14      0x0      Verifying... OK!                   
+[00:00:00] [========================================]       1/1       0x8000   Skipped! (checksum matches)        
+[00:00:15] [========================================]     864/864     0x10000  Verifying... OK!                   
+[2025-09-15T07:23:38Z INFO ] Flashing has completed!
 Commands:
     CTRL+R    Reset chip
     CTRL+C    Exit
@@ -238,162 +238,128 @@ Commands:
 ESP-ROM:esp32s3-20210327
 Build:Mar 27 2021
 rst:0x15 (USB_UART_CHIP_RESET),boot:0x8 (SPI_FAST_FLASH_BOOT)
-Saved PC:0x40378bb6
-0x40378bb6 - rtc_isr
+Saved PC:0x40378d03
+0x40378d03 - setup_priv_desc$isra$0
     at ??:??
 SPIWP:0xee
 mode:DIO, clock div:2
-load:0x3fce3810,len:0x178c
-load:0x403c9700,len:0x4
-load:0x403c9704,len:0xcbc
-load:0x403cc700,len:0x2d9c
-entry 0x403c9914
-I (27) boot: ESP-IDF v5.2.2 2nd stage bootloader
-I (27) boot: compile time Nov 22 2024 19:30:56
+load:0x3fce2810,len:0x1564
+load:0x403c8700,len:0x4
+load:0x403c8704,len:0xd24
+load:0x403cb700,len:0x2ed4
+entry 0x403c8928
+I (27) boot: ESP-IDF v5.4.2 2nd stage bootloader
+I (27) boot: compile time Sep 15 2025 07:22:33
 I (27) boot: Multicore bootloader
-I (30) boot: chip revision: v0.1
+I (28) boot: chip revision: v0.2
+I (30) boot: efuse block revision: v1.3
 I (34) boot.esp32s3: Boot SPI Speed : 40MHz
-I (39) boot.esp32s3: SPI Mode       : DIO
-I (44) boot.esp32s3: SPI Flash Size : 16MB
-I (49) boot: Enabling RNG early entropy source...
-I (54) boot: Partition Table:
-I (58) boot: ## Label            Usage          Type ST Offset   Length
-I (65) boot:  0 nvs              WiFi data        01 02 00009000 00006000
-I (72) boot:  1 phy_init         RF data          01 01 0000f000 00001000
-I (80) boot:  2 factory          factory app      00 00 00010000 00f00000
-I (87) boot: End of partition table
-I (91) esp_image: segment 0: paddr=00010020 vaddr=3c0e0020 size=52034h (335924) map
-I (183) esp_image: segment 1: paddr=0006205c vaddr=3fc9ae00 size=04ce8h ( 19688) load
-I (189) esp_image: segment 2: paddr=00066d4c vaddr=40374000 size=092cch ( 37580) load
-I (200) esp_image: segment 3: paddr=00070020 vaddr=42000020 size=ddea0h (908960) map
-I (427) esp_image: segment 4: paddr=0014dec8 vaddr=4037d2cc size=0dae8h ( 56040) load
-I (453) boot: Loaded app from partition at offset 0x10000
-I (453) boot: Disabling RNG early entropy source...
-I (464) cpu_start: Multicore app
-I (465) octal_psram: vendor id    : 0x0d (AP)
-I (465) octal_psram: dev id       : 0x02 (generation 3)
-I (468) octal_psram: density      : 0x03 (64 Mbit)
-I (473) octal_psram: good-die     : 0x01 (Pass)
-I (478) octal_psram: Latency      : 0x01 (Fixed)
-I (484) octal_psram: VCC          : 0x01 (3V)
-I (489) octal_psram: SRF          : 0x01 (Fast Refresh)
-I (495) octal_psram: BurstType    : 0x01 (Hybrid Wrap)
-I (500) octal_psram: BurstLen     : 0x01 (32 Byte)
-I (506) octal_psram: Readlatency  : 0x02 (10 cycles@Fixed)
-I (512) octal_psram: DriveStrength: 0x00 (1/1)
-I (518) MSPI Timing: PSRAM timing tuning index: 4
-I (523) esp_psram: Found 8MB PSRAM device
-I (527) esp_psram: Speed: 80MHz
-I (543) cpu_start: Pro cpu start user code
-I (543) cpu_start: cpu freq: 160000000 Hz
-I (543) cpu_start: Application information:
-I (546) cpu_start: Project name:     libespidf
-I (551) cpu_start: App version:      9e8d2c8-dirty
-I (557) cpu_start: Compile time:     Nov 22 2024 19:30:46
-I (563) cpu_start: ELF file SHA256:  000000000...
-I (568) cpu_start: ESP-IDF:          v5.2.2
-I (573) cpu_start: Min chip rev:     v0.0
-I (578) cpu_start: Max chip rev:     v0.99 
-I (582) cpu_start: Chip rev:         v0.1
-I (587) heap_init: Initializing. RAM available for dynamic allocation:
-I (594) heap_init: At 3FCA4390 len 00045380 (276 KiB): RAM
-I (600) heap_init: At 3FCE9710 len 00005724 (21 KiB): RAM
-I (607) heap_init: At 3FCF0000 len 00008000 (32 KiB): DRAM
-I (613) heap_init: At 600FE010 len 00001FD8 (7 KiB): RTCRAM
-I (619) esp_psram: Adding pool of 8192K of PSRAM memory to heap allocator
-I (627) spi_flash: detected chip: gd
-I (631) spi_flash: flash io: dio
-W (635) pcnt(legacy): legacy driver is deprecated, please migrate to `driver/pulse_cnt.h`
-W (643) i2c: This driver is an old driver, please migrate your application code to adapt `driver/i2c_master.h`
-W (654) timer_group: legacy driver is deprecated, please migrate to `driver/gptimer.h`
-W (663) ADC: legacy driver is deprecated, please migrate to `esp_adc/adc_oneshot.h`
-I (671) sleep: Configure to isolate all GPIO pins in sleep state
-I (678) sleep: Enable automatic switching of GPIO sleep configuration
-I (685) main_task: Started on CPU0
-I (695) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations
-I (695) main_task: Calling app_main()
-I (715) electricload: [Limit] Current: 15A  Power: 105W
-I (715) gpio: GPIO[15]| InputEn: 0| OutputEn: 0| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0 
-I (725) gpio: GPIO[16]| InputEn: 0| OutputEn: 0| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0 
-I (735) electricload::displayctl: Start Display Thread.
-I (735) electricload: INA228 Config: FB6A
-I (735) electricload: current_lsb=3.125e-5 shunt_cal_val=2048.0 shunt_cal=2048
-I (745) electricload: Max duty: 16383
-I (755) electricload: Max duty: 255
-I (755) gpio: GPIO[42]| InputEn: 0| OutputEn: 0| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0 
-I (765) gpio: GPIO[41]| InputEn: 0| OutputEn: 0| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0 
-I (775) electricload::pulscount: Start puls count thread.
-I (785) pp: pp rom version: e7ae62f
-I (785) net80211: net80211 rom version: e7ae62f
-I (805) wifi:wifi driver task: 3fcc2b98, prio:23, stack:6656, core=0
-I (805) wifi:wifi firmware version: 3e0076f
-I (805) wifi:wifi certification version: v7.0
-I (805) wifi:config NVS flash: disabled
-I (805) wifi:config nano formating: disabled
-I (815) wifi:Init data frame dynamic rx buffer num: 32
-I (815) wifi:Init static rx mgmt buffer num: 10
-I (825) wifi:Init management short buffer num: 32
-I (825) wifi:Init static tx buffer num: 16
-I (825) wifi:Init tx cache buffer num: 32
-I (835) wifi:Init static tx FG buffer num: 2
-I (835) wifi:Init static rx buffer size: 1600
-I (845) wifi:Init static rx buffer num: 10
-I (845) wifi:Init dynamic rx buffer num: 32
-I (845) wifi_init: rx ba win: 6
-I (965) wifi_init: tcpip mbox: 32
-I (965) wifi_init: udp mbox: 6
-I (965) wifi_init: tcp mbox: 6
-I (965) wifi_init: tcp tx win: 5760
-I (975) wifi_init: tcp rx win: 5760
-I (975) wifi_init: tcp mss: 1440
-I (985) wifi_init: WiFi IRAM OP enabled
-I (985) wifi_init: WiFi RX IRAM OP enabled
-I (995) phy_init: phy_version 670,b7bc9b9,Apr 30 2024,10:54:13
-I (1035) wifi:mode : sta ()
-I (1035) wifi:enable tsf
-I (3985) wifi:new:<4,0>, old:<1,0>, ap:<255,255>, sta:<4,0>, prof:1
-I (3985) wifi:state: init -> auth (b0)
-I (3985) wifi:state: auth -> assoc (0)
-I (3995) wifi:state: assoc -> run (10)
-I (4005) wifi:connected with xxxxxxxx, aid = 7, channel 4, BW20, bssid = xx:xx:xx:xx:xx:xx
-I (4005) wifi:security: WPA2-PSK, phy: bgn, rssi: -36
-I (4005) wifi:pm start, type: 1
-I (4005) wifi:dp: 1, bi: 102400, li: 3, scale listen interval from 307200 us to 307200 us
-I (4015) wifi:set rx beacon pti, rx_bcn_pti: 0, bcn_timeout: 25000, mt_pti: 0, mt_time: 10000
-I (4025) wifi:AP's beacon interval = 102400 us, DTIM period = 1
-I (4065) dcpowerunit::wifi: Wifi connected
-I (4065) esp_idf_svc::sntp: Initializing
-I (4065) esp_idf_svc::sntp: Initialization complete
-I (4065) dcpowerunit: NTP Sync Start..
-I (7475) dcpowerunit: NTP Sync Completed: 2024-11-24 08:43:53
-I (7475) dcpowerunit::transfer: Start transfer thread.
-I (7475) dcpowerunit::touchpad: Start TouchPad Read Thread.
-I (7485) gpio: GPIO[18]| InputEn: 0| OutputEn: 0| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0 
-I (7495) dcpowerunit: PID Controller: KP=0.001 KI=0.022 KD=0.00001
-I (7495) dcpowerunit::usbpd: Initializing AP33772S USB-PD controller
-I (7505) dcpowerunit::usbpd: USB-PD controller initialized successfully
-I (7515) dcpowerunit::usbpd: Available PDOs:
-I (7515) dcpowerunit::usbpd:   PDO 1: 5000mV, 3000mA, 15000mW, Fixed
-I (7525) dcpowerunit::usbpd:   PDO 2: 9000mV, 3000mA, 27000mW, Fixed
-I (7535) dcpowerunit::usbpd:   PDO 3: 12000mV, 3000mA, 36000mW, Fixed
-I (7545) dcpowerunit::usbpd:   PDO 4: 15000mV, 3000mA, 45000mW, Fixed
-I (7555) dcpowerunit::usbpd:   PDO 5: 20000mV, 5000mA, 100000mW, Fixed
-I (7565) dcpowerunit::usbpd:   PDO 8: 28000mV, 5000mA, 140000mW, Fixed
-I (7585) dcpowerunit::touchpad: TouchPad4 threshold: 1529
-I (7585) electricload::touchpad: TouchPad5 threshold: 1519
-I (7585) electricload::touchpad: TouchPad6 threshold: 1433
-I (7585) electricload::touchpad: TouchPad7 threshold: 1523
-I (7595) electricload::touchpad: TouchPad8 threshold: 297
-I (7605) electricload::touchpad: TouchPad3 threshold: 1436
-I (7605) electricload::touchpad: TouchPad9 threshold: 291
-I (7625) electricload::touchpad: TouchPad1 threshold: 325
-I (7625) electricload::touchpad: TouchPad2 threshold: 1619
-I (7625) electricload::touchpad: TouchPad14 threshold: 313
-I (7645) electricload::touchpad: TouchPad13 threshold: 307
-I (7645) electricload::touchpad: TouchPad12 threshold: 302
-I (7645) electricload::touchpad: TouchPad11 threshold: 287
-I (7645) electricload::touchpad: TouchPad10 threshold: 281
-I (7665) electricload::touchpad: TouchPad charge discharge times: 500 -> 1000
+I (38) boot.esp32s3: SPI Mode       : DIO
+I (41) boot.esp32s3: SPI Flash Size : 16MB
+I (45) boot: Enabling RNG early entropy source...
+I (50) boot: Partition Table:
+I (52) boot: ## Label            Usage          Type ST Offset   Length
+I (59) boot:  0 nvs              WiFi data        01 02 00009000 00006000
+I (65) boot:  1 phy_init         RF data          01 01 0000f000 00001000
+I (72) boot:  2 factory          factory app      00 00 00010000 00177000
+I (78) boot: End of partition table
+I (81) esp_image: segment 0: paddr=00010020 vaddr=3c0f0020 size=4b244h (307780) map
+I (164) esp_image: segment 1: paddr=0005b26c vaddr=3fc9c700 size=04dach ( 19884) load
+I (170) esp_image: segment 2: paddr=00060020 vaddr=42000020 size=e89e8h (952808) map
+I (404) esp_image: segment 3: paddr=00148a10 vaddr=3fca14ac size=00bfch (  3068) load
+I (406) esp_image: segment 4: paddr=00149614 vaddr=40374000 size=186f0h (100080) load
+I (437) esp_image: segment 5: paddr=00161d0c vaddr=600fe000 size=0001ch (    28) load
+I (447) boot: Loaded app from partition at offset 0x10000
+I (447) boot: Disabling RNG early entropy source...
+I (457) octal_psram: vendor id    : 0x0d (AP)
+I (457) octal_psram: dev id       : 0x02 (generation 3)
+I (458) octal_psram: density      : 0x03 (64 Mbit)
+I (460) octal_psram: good-die     : 0x01 (Pass)
+I (464) octal_psram: Latency      : 0x01 (Fixed)
+I (468) octal_psram: VCC          : 0x01 (3V)
+I (472) octal_psram: SRF          : 0x01 (Fast Refresh)
+I (477) octal_psram: BurstType    : 0x01 (Hybrid Wrap)
+I (482) octal_psram: BurstLen     : 0x01 (32 Byte)
+I (487) octal_psram: Readlatency  : 0x02 (10 cycles@Fixed)
+I (492) octal_psram: DriveStrength: 0x00 (1/1)
+I (497) MSPI Timing: PSRAM timing tuning index: 5
+I (500) esp_psram: Found 8MB PSRAM device
+I (504) esp_psram: Speed: 80MHz
+I (507) cpu_start: Multicore app
+I (522) cpu_start: Pro cpu start user code
+I (522) cpu_start: cpu freq: 160000000 Hz
+I (522) app_init: Application information:
+I (522) app_init: Project name:     libespidf
+I (526) app_init: App version:      100adf2
+I (530) app_init: Compile time:     Sep 15 2025 07:22:02
+I (535) app_init: ELF file SHA256:  000000000...
+I (539) app_init: ESP-IDF:          v5.4.2
+I (543) efuse_init: Min chip rev:     v0.0
+I (547) efuse_init: Max chip rev:     v0.99 
+I (551) efuse_init: Chip rev:         v0.2
+I (555) heap_init: Initializing. RAM available for dynamic allocation:
+I (561) heap_init: At 3FCA6A48 len 00042CC8 (267 KiB): RAM
+I (566) heap_init: At 3FCE9710 len 00005724 (21 KiB): RAM
+I (571) heap_init: At 3FCF0000 len 00008000 (32 KiB): DRAM
+I (576) heap_init: At 600FE01C len 00001FCC (7 KiB): RTCRAM
+I (582) esp_psram: Adding pool of 8192K of PSRAM memory to heap allocator
+I (589) spi_flash: detected chip: gd
+I (592) spi_flash: flash io: dio
+W (595) pcnt(legacy): legacy driver is deprecated, please migrate to `driver/pulse_cnt.h`
+W (602) i2c: This driver is an old driver, please migrate your application code to adapt `driver/i2c_master.h`
+W (612) timer_group: legacy driver is deprecated, please migrate to `driver/gptimer.h`
+I (620) sleep_gpio: Configure to isolate all GPIO pins in sleep state
+I (626) sleep_gpio: Enable automatic switching of GPIO sleep configuration
+I (633) main_task: Started on CPU0
+I (643) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations
+I (643) main_task: Calling app_main()
+I (653) gpio: GPIO[15]| InputEn: 0| OutputEn: 0| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0 
+I (653) gpio: GPIO[16]| InputEn: 0| OutputEn: 0| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0 
+I (663) gpio: GPIO[46]| InputEn: 0| OutputEn: 0| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0 
+I (683) pp: pp rom version: e7ae62f
+I (683) net80211: net80211 rom version: e7ae62f
+I (693) wifi:wifi driver task: 3fcc44a0, prio:23, stack:6656, core=0
+I (693) wifi:wifi firmware version: bea31f3
+I (693) wifi:wifi certification version: v7.0
+I (693) wifi:config NVS flash: disabled
+I (693) wifi:config nano formatting: disabled
+I (703) wifi:Init data frame dynamic rx buffer num: 32
+I (703) wifi:Init static rx mgmt buffer num: 5
+I (713) wifi:Init management short buffer num: 32
+I (713) wifi:Init dynamic tx buffer num: 32
+I (723) wifi:Init static tx FG buffer num: 2
+I (723) wifi:Init static rx buffer size: 1600
+I (723) wifi:Init static rx buffer num: 10
+I (733) wifi:Init dynamic rx buffer num: 32
+I (733) wifi_init: rx ba win: 6
+I (733) wifi_init: accept mbox: 6
+I (743) wifi_init: tcpip mbox: 32
+I (743) wifi_init: udp mbox: 6
+I (743) wifi_init: tcp mbox: 6
+I (753) wifi_init: tcp tx win: 5760
+I (753) wifi_init: tcp rx win: 5760
+I (753) wifi_init: tcp mss: 1440
+I (763) wifi_init: WiFi IRAM OP enabled
+I (763) wifi_init: WiFi RX IRAM OP enabled
+I (773) phy_init: phy_version 701,f4f1da3a,Mar  3 2025,15:50:10
+I (803) wifi:mode : sta (80:65:99:b8:8e:90)
+I (803) wifi:enable tsf
+I (3313) wifi:new:<8,0>, old:<1,0>, ap:<255,255>, sta:<8,0>, prof:1, snd_ch_cfg:0x0
+I (3313) wifi:state: init -> auth (0xb0)
+I (3313) wifi:state: auth -> assoc (0x0)
+I (3323) wifi:state: assoc -> run (0x10)
+I (3333) wifi:connected with Buffalo-G-1AD0, aid = 4, channel 8, BW20, bssid = c4:3c:ea:df:1a:d0
+I (3333) wifi:security: WPA2-PSK, phy: bgn, rssi: -51
+I (3333) wifi:pm start, type: 1
+
+I (3333) wifi:dp: 1, bi: 102400, li: 3, scale listen interval from 307200 us to 307200 us
+I (3343) wifi:set rx beacon pti, rx_bcn_pti: 0, bcn_timeout: 25000, mt_pti: 0, mt_time: 10000
+I (3423) wifi:AP's beacon interval = 102400 us, DTIM period = 1
+I (5353) esp_netif_handlers: sta ip: 192.168.2.142, mask: 255.255.255.0, gw: 192.168.2.1
+I (9063) wifi:<ba-add>idx:0 (ifx:0, c4:3c:ea:df:1a:d0), tid:0, ssn:3, winSize:64
+I (13373) wifi:<ba-add>idx:1 (ifx:0, c4:3c:ea:df:1a:d0), tid:2, ssn:0, winSize:64
+I (13383) gpio: GPIO[18]| InputEn: 0| OutputEn: 0| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0 
+I (13393) gpio: GPIO[9]| InputEn: 0| OutputEn: 0| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0 
 ```
 
 ## How to Install the influxDB and Configure the Dashboard
@@ -431,27 +397,21 @@ After copy the token, click `CONFIGURE LATER`.
 
 Click the `Dashboard` icon, and select `Import Dashboard` from the `CREATE DASHBOARD` menu.
 
-Drop the `influxdb/electric_load.json` file to `Drop a file here`, then click `IMPORT JSON AS DASHBOARD`.
+Drop the `influxdb/dc_power_station.json` file to `Drop a file here`, then click `IMPORT JSON AS DASHBOARD`.
 
-You can see the `ELECTRIC LOAD` pannel on the Dashboards page.
+You can see the `DC POWER STATION` pannel on the Dashboards page.
 
 Click this panel, and You can see the dashboard.
+
+![dashboard](doc/dashboard.png)
 
 If you want to customize the dashboard design, click configure mark. You can change the graph design.
 
 ## Schematic, PCB Gabar Data
 
 There is a Schematic data in hardware directory. 
-If you want to make the PCB, you can order the [PCBway](https://www.pcbway.com/project/shareproject/Digitally_Controlled_Electric_Load_504eb052.html) this link.
-The heat sink is not included in the schematic data. You can use the heat sink with the fan for LGA115x CPU Cooler. 
 
-I used this [heat sink](https://www.ainex.jp/products/cc-06b/)
-
-I guess another [heat sink](https://www.tronwire.com/collections/tronwire-cpu-coolers/products/tw-10) is also good.
-
-This PCB is designed by [Kicad](https://www.kicad.org/). This board image photo is shown the jumper wire. But, the PCB data is already fixed the error.
-
-UPDATE 2024-12-29: I changed the OpAmp from TSB6111ILT to OPA187IDBVR. OPA187IDBVR is a low noise and low offset voltage OpAmp. It can be used for the high precision control.
+This PCB is designed by [Kicad](https://www.kicad.org/). 
 
 ## LICENSE
 This source code is licensed under MIT. Other Hardware Schematic documents are licensed under CC-BY-SA V4.0.

@@ -464,6 +464,29 @@ impl AP33772S {
         }
     }
 
+    /// Get maximum voltage and current limits from available PDOs
+    pub fn get_pdo_limits(&self) -> (f32, f32) {
+        let pdo_list = self.driver.get_pdo_list();
+        let mut max_voltage_mv = 0u16;
+        let mut max_current_ma = 0u16;
+
+        for pdo in pdo_list {
+            if pdo.voltage_mv > max_voltage_mv {
+                max_voltage_mv = pdo.voltage_mv;
+            }
+            if pdo.current_ma > max_current_ma {
+                max_current_ma = pdo.current_ma;
+            }
+        }
+
+        let max_voltage_v = max_voltage_mv as f32 / 1000.0;
+        let max_current_a = max_current_ma as f32 / 1000.0;
+        
+        info!("PDO Limits: Max Voltage = {:.2}V, Max Current = {:.3}A", max_voltage_v, max_current_a);
+        
+        (max_voltage_v, max_current_a)
+    }
+
     /// Dump register values for debugging
     pub fn dump_registers(&self, i2cdrv: &mut i2c::I2cDriver) -> anyhow::Result<()> {
         info!("Register dump functionality moved to generic driver");

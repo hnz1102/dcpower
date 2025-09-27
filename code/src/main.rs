@@ -106,8 +106,8 @@ fn main() -> anyhow::Result<()> {
     let max_current_limit = CONFIG.max_current_limit.parse::<f32>().unwrap();
     let max_power_limit = CONFIG.max_power_limit.parse::<f32>().unwrap();
     let max_temperature = CONFIG.max_temperature.parse::<f32>().unwrap();
-    println!("[Limit] Current: {}A  Power: {}W  Temperature: {}°C (println)", max_current_limit, max_power_limit, max_temperature);
-    info!("[Limit] Current: {}A  Power: {}W  Temperature: {}°C (info)", max_current_limit, max_power_limit, max_temperature);
+    println!("[Config Limit] Current: {}A  Power: {}W  Temperature: {}°C", max_current_limit, max_power_limit, max_temperature);
+    info!("[Config Limit] Current: {}A  Power: {}W  Temperature: {}°C", max_current_limit, max_power_limit, max_temperature);
     let server_info = ServerInfo::new(CONFIG.influxdb_server.to_string(), 
         CONFIG.influxdb_api_key.to_string(),
         CONFIG.influxdb_api.to_string(),
@@ -184,6 +184,17 @@ fn main() -> anyhow::Result<()> {
     }
     let _ = ap33772s.request_voltage(&mut i2cdrv, PDVoltage::V5);
     // ap33772s.force_vout_off(&mut i2cdrv).unwrap();
+
+    // Get PDO limits from connected source
+    i2c_sel.set_high().unwrap(); // Enable USB PD for PDO query
+    let (pdo_max_voltage, pdo_max_current) = ap33772s.get_pdo_limits();
+    info!("PDO Limits: Max Voltage = {:.2}V, Max Current = {:.3}A", pdo_max_voltage, pdo_max_current);
+    
+    // Apply the more restrictive limit between config and PDO
+    let effective_max_current = if pdo_max_current < max_current_limit { pdo_max_current } else { max_current_limit };
+    info!("Effective Current Limit: {:.3}A (Config: {:.3}A, PDO: {:.3}A)", 
+          effective_max_current, max_current_limit, pdo_max_current);
+    println!("[Effective Limits] Voltage: {:.2}V  Current: {:.3}A", pdo_max_voltage, effective_max_current);
 
     // Select INA228
     i2c_sel.set_low().unwrap(); // Select INA228
@@ -375,6 +386,11 @@ fn main() -> anyhow::Result<()> {
             let key_event = touchpad.get_key_event_and_clear();
             for key in &key_event {
                 match key {
+                    KeyEvent::CenterKeyDown => {
+                        // Clear error messages when center key is pressed
+                        dp.set_message("".to_string(), false, 0);
+                        info!("Error message cleared by center key press");
+                    },
                     KeyEvent::CenterKeyDownLong => {
                         if start_stop_btn == false {
                             start_stop_btn = true;
@@ -385,14 +401,23 @@ fn main() -> anyhow::Result<()> {
                     },
                     KeyEvent::UpKeyDown => {
                         set_output_voltage += 0.1;
+                        if set_output_voltage > pdo_max_voltage {
+                            set_output_voltage = pdo_max_voltage;
+                        }
                         dp.set_output_voltage(set_output_voltage);
                     },
                     KeyEvent::RightKeyDown => {
                         set_output_voltage += 0.01;
+                        if set_output_voltage > pdo_max_voltage {
+                            set_output_voltage = pdo_max_voltage;
+                        }
                         dp.set_output_voltage(set_output_voltage);
                     },
                     KeyEvent::UpKeyDownLong => {
                         set_output_voltage = ((set_output_voltage + 1.0) as u32) as f32;
+                        if set_output_voltage > pdo_max_voltage {
+                            set_output_voltage = pdo_max_voltage;
+                        }
                         dp.set_output_voltage(set_output_voltage);
                     },
                     KeyEvent::DownKeyDown => {
@@ -529,12 +554,12 @@ fn main() -> anyhow::Result<()> {
             }
         }
         // Current and Power Limit
-        if data.current > max_current_limit {
-            info!("Current Limit Over: {:.3}A", data.current);
+        if data.current > effective_max_current && load_start == true {
+            info!("Current Limit Over: {:.3}A (PDO Limited)", data.current);
             dp.set_message(format!("Current OV {:.3}A", data.current), true, 3000);
             load_start = false;
         }
-        if data.power > max_power_limit {
+        if data.power > max_power_limit && load_start == true {
             info!("Power Limit Over: {:.1}W", data.power);
             dp.set_message(format!("Power OV {:.1}W", data.power), true, 3000);
             load_start = false;
@@ -544,7 +569,7 @@ fn main() -> anyhow::Result<()> {
         let temp = temp_pin.read().unwrap() as f32 * 0.05;
         data.temp = temp;
         // Temperature Safety Check
-        if temp > max_temperature {
+        if temp > max_temperature && load_start == true {
             info!("Temperature Limit Over: {:.1}°C", temp);
             dp.set_message(format!("Temp OV {:.1}°C", temp), true, 3000);
             load_start = false;
@@ -560,13 +585,22 @@ fn main() -> anyhow::Result<()> {
             pid.reset();
             pwm_duty = 0;
         }
-        else if data.current > max_current_limit {
+        else if data.current > effective_max_current {
             // no voltage, over current
             info!("Voltage Off due to over current or load stop {}", data.current);
             pid.reset();
             pwm_duty = 0;
         }
         else {
+            // Check voltage overshoot (>110% of setpoint)
+            let voltage_overshoot_threshold = set_output_voltage * 1.10;
+            if data.voltage > voltage_overshoot_threshold && set_output_voltage > 0.0 {
+                info!("Voltage overshoot detected: {:.3}V > {:.3}V (110% of {:.3}V) - Resetting PID", 
+                      data.voltage, voltage_overshoot_threshold, set_output_voltage);
+                pid.reset();
+                // Continue with PID control after reset
+            }
+            
             // PID Control
             let pid_out = pid.update(data.voltage);
             pwm_duty = (pid_out * (max_duty as f32)) as u32 + pwm_offset;

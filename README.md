@@ -5,10 +5,12 @@
   </p>
 </div>
 
-# DC Power Unit for Breadboard (Under Development)
+# DC Power Unit for Breadboard
 
-This is a DC Power Unit for Breadboard based on ESP32-S3 microcontroller and AP33772S USB Power Delivery (PD) Sink Controller. It can supply power to the breadboard from USB Power Delivery (PD) Charger with support for both Standard Power Range (SPR) and Extended Power Range (EPR) modes. The output voltage can be controlled from 0v to 20V in SPR mode and up to 48V in EPR mode with step of 10mV.   
+This is a DC Power Unit for Breadboard based on ESP32-S3 microcontroller and AP33772S USB Power Delivery (PD) Sink Controller. It can supply power to the breadboard from USB Power Delivery (PD) Charger with support for both Standard Power Range (SPR) and Extended Power Range (EPR) modes. The output voltage can be controlled from 0v to 20V in SPR mode and up to 48V(*1) in EPR mode with step of 10mV.   
 There are 2 types of adopters for the output terminal: Single positive power output terminal and dual positive/negative output terminal. It is easy to connect to the breadboard with standard 2.54mm pitch pin header. If you select the dual positive/negative output terminal adopter, the output voltage can be halved by positive and negative voltage. E.g. If you set the output voltage to 20V, you can get +10V and -10V from the positive and negative output terminal.
+
+***1: Some PD chargers may not support EPR mode or only support up to 16V/5A. Please check your PD charger specifications.**
 
 ![adopter](doc/adaptor-s.jpg)
 
@@ -25,8 +27,9 @@ The left image shows the single positive output terminal adopter, and the right 
 - **Real-time Display**: OLED display shows voltage, current, power consumption, and temperature
 - **Data Logging**: WiFi connectivity for sending measurement data to InfluxDB server
 - **Web Dashboard**: Data visualization using InfluxDB dashboard
+- **Safety Features**: Over Voltage Protection (OVP), Under Voltage Protection (UVP), Over Current Protection (OCP). Over Temperature Protection (OTP) does not implemented.
 
-**Note**: Some PD chargers may not support EPR mode or only support up to 28V/5A. Please check your PD charger specifications.
+****Note**: If you use 21V or higher voltage, input voltage is 28v or higher, and differential voltage is over 3V and output current is over 3A, the MOSFET device is in the high consumption state and the unit temperature may rise over 80 degrees Celsius. Please be careful about the temperature. You can set the maximum temperature in the configuration file. The default value is 80 degrees Celsius. If the temperature exceeds the limit, the output will be disabled automatically. I recommend using less than 0.7A current at 21V or higher voltage. Otherwise, if you set the output voltage to 27V or higher, the temperature rise is not a problem.**
 
 ## Hardware Components
 
@@ -53,6 +56,7 @@ The firmware is written in Rust using the ESP-IDF framework and consists of seve
 - `transfer.rs`: Data transmission to InfluxDB server
 - `syslogger.rs`: System logging functionality
 
+ap33772s-driver crate is used for USB-PD communication with the AP33772S controller. Please see the [ap33772s-driver](https://github.com/hnz1102/ap33772s-driver) for more details.
 
 ## How to Use the Unit
 
@@ -71,12 +75,13 @@ The firmware is written in Rust using the ESP-IDF framework and consists of seve
 - **Center Touch**: Long press to toggle output ON/OFF
 - **Display Information**: Shows current voltage, current, power, unit temperature, and WiFi status
 
+**If the output is disabled due to over current, over power, or over temperature, you can clear the error message by pressing the center touch position once.**
+
 ### Safety Features
 
 - Under Voltage Protection (UVP)
 - Over Voltage Protection (OVP) 
 - Over Current Protection (OCP)
-- Over Temperature Protection (OTP)
 - Automatic fault detection and shutdown
 
 These protections are implemented by the AP33772S.
@@ -185,11 +190,12 @@ pid_kp = "0.0000005"
 pid_ki = "0.00002"
 pid_kd = "0.1"
 pwm_offset = "0"
-pd_config_offset = "2.5"
+pd_config_offset = "1.5"
 shunt_resistance = "0.005"
 shunt_temp_coefficient = "50"
 max_current_limit = "5.2"
 max_power_limit = "100.0"
+max_temperature_limit = "75" # Set the maximum temperature limit in degrees Celsius. Default is 75 degrees.
 influxdb_api_key = "<InfluxDB API KEY>" # Set your InfluxDB API Key
 influxdb_api = "/api/v2/write?org=<ORG>&bucket=LOGGER&precision=ns" # Set your InfluxDB API with your ORG and BUCKET
 influxdb_tag = "dcpowerunit"  # Tag for InfluxDB measurements

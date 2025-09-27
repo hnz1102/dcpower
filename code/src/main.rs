@@ -64,6 +64,8 @@ pub struct Config {
     max_current_limit: &'static str,
     #[default("110.0")]
     max_power_limit: &'static str,
+    #[default("75.0")]
+    max_temperature: &'static str,
     #[default("")]
     influxdb_api_key: &'static str,
     #[default("")]
@@ -81,6 +83,14 @@ pub struct Config {
 fn main() -> anyhow::Result<()> {
     esp_idf_sys::link_patches();
     
+    // Initialize the default ESP logger only if syslog is disabled
+    // If syslog is enabled, we'll initialize the syslog logger later
+    if CONFIG.syslog_enable != "true" {
+        esp_idf_svc::log::EspLogger::initialize_default();
+        // Set log level to INFO to ensure info!() messages are displayed
+        log::set_max_level(log::LevelFilter::Info);
+    }
+    
     // Peripherals Initialize
     let peripherals = Peripherals::take().unwrap();
     // Initialize nvs
@@ -89,12 +99,15 @@ fn main() -> anyhow::Result<()> {
     }
 
     // Log startup message
-    info!("DCPowerUnit2 application started");
+    println!("DCPowerUnit2 application started (println)");
+    info!("DCPowerUnit2 application started (info)");
     
     // Load Config
     let max_current_limit = CONFIG.max_current_limit.parse::<f32>().unwrap();
     let max_power_limit = CONFIG.max_power_limit.parse::<f32>().unwrap();
-    info!("[Limit] Current: {}A  Power: {}W", max_current_limit, max_power_limit);
+    let max_temperature = CONFIG.max_temperature.parse::<f32>().unwrap();
+    println!("[Limit] Current: {}A  Power: {}W  Temperature: {}°C (println)", max_current_limit, max_power_limit, max_temperature);
+    info!("[Limit] Current: {}A  Power: {}W  Temperature: {}°C (info)", max_current_limit, max_power_limit, max_temperature);
     let server_info = ServerInfo::new(CONFIG.influxdb_server.to_string(), 
         CONFIG.influxdb_api_key.to_string(),
         CONFIG.influxdb_api.to_string(),
@@ -143,9 +156,20 @@ fn main() -> anyhow::Result<()> {
             return Err(anyhow::anyhow!("Failed to initialize AP33772S: {:?}", e));
         }
     }
+
+    // Configure protection features: UVP=true, OVP=true, OCP=true, OTP=false, DR=false
+    match ap33772s.configure_protections(&mut i2cdrv, true, true, true, false, false) {
+        Ok(()) => {
+            info!("AP33772S protections configured successfully");
+        },
+        Err(e) => {
+            warn!("Failed to configure AP33772S protections: {:?}", e);
+        }
+    }
     match ap33772s.get_status(&mut i2cdrv) {
         Ok(status) => {
             // For debugging purposes, log status occasionally
+            // Not implemented: NTC thermistor
             info!(
                 "PD Status: Voltage={}mV, Current={}mA, Temp={}°C, PDP={}W",
                 status.voltage_mv,
@@ -158,7 +182,7 @@ fn main() -> anyhow::Result<()> {
             info!("Failed to read AP33772S status: {:?}", e);
         }
     }
-    let _ = ap33772s.request_voltage(&mut i2cdrv, PDVoltage::V12);
+    let _ = ap33772s.request_voltage(&mut i2cdrv, PDVoltage::V5);
     // ap33772s.force_vout_off(&mut i2cdrv).unwrap();
 
     // Select INA228
@@ -238,18 +262,28 @@ fn main() -> anyhow::Result<()> {
     let mut wifi_dev = wifi::wifi_connect(peripherals.modem, CONFIG.wifi_ssid, CONFIG.wifi_psk);
 
     if CONFIG.syslog_enable == "true" {
-        // Initialize logging - first try ESP logger since it's most reliable
-        // esp_idf_svc::log::EspLogger::initialize_default();
+        // Initialize syslog logger to replace the default ESP logger
+        println!("Initializing syslog logger...");
         thread::sleep(Duration::from_secs(5));
         
         match syslogger::init_logger(CONFIG.syslog_server, CONFIG.syslog_enable) {
             Ok(_) => {
+                // Set log level for syslog
+                log::set_max_level(log::LevelFilter::Info);
+                println!("Syslog logger initialized successfully");
                 info!("Syslog logger initialized successfully");
             },
             Err(e) => {
+                // Fallback to ESP logger if syslog fails
+                println!("Failed to initialize syslog logger: {:?}, using ESP logger instead", e);
+                esp_idf_svc::log::EspLogger::initialize_default();
+                log::set_max_level(log::LevelFilter::Info);
                 info!("Failed to initialize syslog logger: {:?}, using ESP logger instead", e);
             }
         }
+    } else {
+        // syslog_enable is false, continue using default ESP console logger
+        info!("Using default ESP console logger (syslog disabled)");
     }
     
     // NTP Server
@@ -445,7 +479,7 @@ fn main() -> anyhow::Result<()> {
         if load_start == true {
             pid.set_setpoint(set_output_voltage);
             let diff_setpoint = set_output_voltage - previous_set_output_voltage;
-            if diff_setpoint > 1.0 || diff_setpoint < -1.0 {
+            if diff_setpoint >= 0.1 || diff_setpoint <= -0.1 {
                 // Set USB PD Voltage
                 info!("Changing USB PD Voltage to {:.2}V from {:.2}V", set_output_voltage, previous_set_output_voltage);
                 usbpd_control(&mut i2c_sel, &mut ap33772s, &mut i2cdrv, set_output_voltage, pd_config_offset);
@@ -485,7 +519,7 @@ fn main() -> anyhow::Result<()> {
             }
         }
         // Power
-        match power_read(&mut i2cdrv) {
+        match power_read(&mut i2cdrv, current_lsb) {
             Ok(power) => {
                 data.power = power;
             },
@@ -509,10 +543,16 @@ fn main() -> anyhow::Result<()> {
         // Temperature
         let temp = temp_pin.read().unwrap() as f32 * 0.05;
         data.temp = temp;
+        // Temperature Safety Check
+        if temp > max_temperature {
+            info!("Temperature Limit Over: {:.1}°C", temp);
+            dp.set_message(format!("Temp OV {:.1}°C", temp), true, 3000);
+            load_start = false;
+        }
         // info!("Temperature: {:.2}°C", temp);
         dp.set_temperature(temp);
         // USB PD Voltage
-        let pd_voltage = usb_pd_pin.read().unwrap() as f32 * 0.0113; // (47K + 4.7K) / 4.7K / 1000
+        let pd_voltage = usb_pd_pin.read().unwrap() as f32 * 0.01125; // (47K + 4.7K) / 4.7K / 1000
         dp.set_usb_pd_voltage(pd_voltage);
         // info!("USB PD Voltage: {:.2}V", pd_voltage);
         dp.set_voltage(data.voltage, data.current, data.power);
@@ -595,13 +635,13 @@ fn voltage_read(i2cdrv: &mut i2c::I2cDriver) -> anyhow::Result<f32> {
     }
 }
 
-fn power_read(i2cdrv: &mut i2c::I2cDriver) -> anyhow::Result<f32> {
+fn power_read(i2cdrv: &mut i2c::I2cDriver, current_lsb: f32) -> anyhow::Result<f32> {
     let mut power_buf = [0u8; 3];
     i2cdrv.write(0x40, &[0x08u8; 1], BLOCK)?;
     match i2cdrv.read(0x40, &mut power_buf, BLOCK) {
         Ok(_v) => {
             let power_reg = ((power_buf[0] as u32) << 16 | (power_buf[1] as u32) << 8 | (power_buf[2] as u32)) as f32;
-            let power = 3.2 * 16.384 / 524_288.0 * power_reg;
+            let power = 3.2 * current_lsb * power_reg;
             return Ok(power);
         },
         Err(e) => {
@@ -639,6 +679,7 @@ fn usbpd_control(i2c_sel: &mut PinDriver<Gpio46, Output>,
     // USB PD Control
     ap33772_usbpd_control(ap33772s, i2cdrv, voltage, pd_config_offset);
     i2c_sel.set_low().unwrap(); // Disable USB PD
+
 } 
 
 // if output_control is used, USB current will be unstable. 
@@ -692,7 +733,7 @@ fn ap33772_usbpd_control(ap33772s: &mut AP33772S, i2cdrv: &mut i2c::I2cDriver, v
         req_voltage = available_voltage;
     }
     let pd_voltage = (req_voltage * 1000.0) as u16;
-    if req_voltage > 12.0 {
+    if req_voltage >= 5.0 {
         // Try to request custom voltage PPS APDO
         match ap33772s.request_custom_voltage(i2cdrv, pd_voltage, max_current_limit) {
             Ok(()) => {
@@ -702,10 +743,8 @@ fn ap33772_usbpd_control(ap33772s: &mut AP33772S, i2cdrv: &mut i2c::I2cDriver, v
                 info!("Failed to request voltage: {:?}", e);
             }
         }
-    }
-    // try to request maximum current to be 3A
-    max_current_limit = 3000;
-    if req_voltage > 12.0 {
+        // try to request maximum current to be 3A
+        max_current_limit = 3000;
         // try to request custom voltage PPS APDO
         match ap33772s.request_custom_voltage(i2cdrv, pd_voltage, max_current_limit) {
             Ok(()) => {
@@ -717,13 +756,14 @@ fn ap33772_usbpd_control(ap33772s: &mut AP33772S, i2cdrv: &mut i2c::I2cDriver, v
         }
     }
     else {
-        // It is 12V, to maintain voltage
-        match ap33772s.request_voltage(i2cdrv, PDVoltage::V12) {
+        // 5V Fixed PDO
+        // This unit needs to power on 5V.
+        match ap33772s.request_voltage(i2cdrv, PDVoltage::V5) {
             Ok(()) => {
                 return;
             },
             Err(e) => {
-                info!("Failed to request voltage: {:?}", e);
+                info!("Failed to request 5V: {:?}", e);
             }
         }
     }

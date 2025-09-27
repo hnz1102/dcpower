@@ -13,9 +13,9 @@ use embedded_graphics::{
     image::Image,
     pixelcolor::{Rgb565},
     text::{Text},
-    geometry::Point,
+    geometry::{Point, Size},
     primitives::{
-        Circle, Line, Triangle, PrimitiveStyle,
+        Circle, Line, Triangle, Rectangle, PrimitiveStyle,
     },
     prelude::*,
 };
@@ -101,6 +101,7 @@ impl DisplayPanel {
             let middle_style_red = MonoTextStyle::new(&FONT_6X12, Rgb565::RED);
             let middle_style_yellow = MonoTextStyle::new(&FONT_6X12, Rgb565::YELLOW);
             let middle_style_blue = MonoTextStyle::new(&FONT_6X12, Rgb565::BLUE);
+            let red_bg = PrimitiveStyle::with_fill(Rgb565::RED);
             let _small_style_white = MonoTextStyle::new(&FONT_5X8, Rgb565::WHITE);
             let wifibmp = Bmp::from_slice(include_bytes!("./img/wifirev.bmp")).unwrap();
             let wifi_img: Image<Bmp<Rgb565>> = Image::new(&wifibmp, Point::new(86, 47));
@@ -318,7 +319,17 @@ impl DisplayPanel {
                 match loopcount {
                     0..=5 => {
                         // Temperature
-                        Text::new(&format!("{:.0}C", lck.temperature), Point::new(54, 60), middle_style_white).draw(&mut display).unwrap();
+                        if lck.temperature < 50.0 {
+                            Text::new(&format!("{:.0}C", lck.temperature), Point::new(54, 60), middle_style_white).draw(&mut display).unwrap();
+                        } else if lck.temperature < 60.0 {
+                            Text::new(&format!("{:.0}C", lck.temperature), Point::new(54, 60), middle_style_yellow).draw(&mut display).unwrap();
+                        } else {
+                            // Background rectangle for temperatures over 60C
+                            Rectangle::new(Point::new(54, 52), Size::new(30, 12))
+                                .into_styled(red_bg)
+                                .draw(&mut display).unwrap();
+                            Text::new(&format!("{:.0}C", lck.temperature), Point::new(54, 60), middle_style_white).draw(&mut display).unwrap();
+                        }
                     },
                     6..=10 => {
                         // USB PD Voltage

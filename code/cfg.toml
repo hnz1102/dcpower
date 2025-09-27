@@ -6,11 +6,12 @@ pid_kp = "0.0000005"
 pid_ki = "0.00002"
 pid_kd = "0.1"
 pwm_offset = "0"
-pd_config_offset = "2.5"
+pd_config_offset = "1.5"
 shunt_resistance = "0.005"
 shunt_temp_coefficient = "50"
 max_current_limit = "5.2"
 max_power_limit = "100.0"
+max_temperature = "75"
 influxdb_api_key = "<InfluxDB API KEY>" # Set your InfluxDB API Key
 influxdb_api = "/api/v2/write?org=<ORG>&bucket=LOGGER&precision=ns" # Set your InfluxDB API with your ORG and BUCKET
 influxdb_tag = "dcpowerunit"  # Tag for InfluxDB measurements

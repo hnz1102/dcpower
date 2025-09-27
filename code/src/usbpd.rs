@@ -189,47 +189,111 @@ impl AP33772S {
                 if pdo.is_fixed { "Fixed" } else { "Variable" });
         }
         
-        // Find best matching PDO
+        // Find best matching PDO with improved selection logic
+        // Priority: 1. Variable PDO that can provide exact voltage
+        //          2. Variable PDO with smallest difference
+        //          3. Fixed PDO with smallest difference (voltage >= requested)
         let mut best_pdo: Option<&ap33772s_driver::PDOInfo> = None;
         let mut best_diff = u32::MAX;
+        let mut best_is_variable = false;
         
         for pdo in pdo_list {
-            if pdo.voltage_mv >= voltage_mv {
-                let diff = (pdo.voltage_mv as u32) - (voltage_mv as u32);
-                if diff < best_diff {
+            let is_variable = !pdo.is_fixed;
+            let can_provide_voltage = if is_variable {
+                // For variable PDOs, assume they can provide any voltage up to their maximum
+                pdo.voltage_mv >= voltage_mv
+            } else {
+                // For fixed PDOs, only consider if their voltage is >= requested voltage
+                pdo.voltage_mv >= voltage_mv
+            };
+            
+            if can_provide_voltage {
+                let diff = if is_variable && pdo.voltage_mv >= voltage_mv {
+                    // For variable PDOs, the difference is minimal if it can provide exact voltage
+                    0u32
+                } else {
+                    // For fixed PDOs or when variable PDO max is lower, calculate actual difference
+                    (pdo.voltage_mv as u32).saturating_sub(voltage_mv as u32)
+                };
+                
+                // Selection criteria:
+                // 1. Prefer variable PDOs over fixed PDOs
+                // 2. Among same type, prefer smaller voltage difference
+                // 3. If same difference, prefer higher power capability
+                let should_select = match (best_pdo, is_variable, best_is_variable) {
+                    (None, _, _) => true, // First candidate
+                    (Some(_), true, false) => true, // Variable PDO beats Fixed PDO
+                    (Some(_), false, true) => false, // Fixed PDO loses to Variable PDO
+                    (Some(current_best), _, _) => {
+                        // Same type comparison
+                        if diff < best_diff {
+                            true // Better voltage match
+                        } else if diff == best_diff {
+                            // Same voltage difference, prefer higher power
+                            pdo.max_power_mw > current_best.max_power_mw
+                        } else {
+                            false // Worse voltage match
+                        }
+                    }
+                };
+                
+                if should_select {
                     best_diff = diff;
                     best_pdo = Some(pdo);
+                    best_is_variable = is_variable;
                 }
             }
         }
         
         if let Some(best_pdo) = best_pdo {
-            info!("Found suitable PDO {}: {}mV (requested {}mV)", 
-                best_pdo.pdo_index, best_pdo.voltage_mv, voltage_mv);
+            info!("Selected PDO {}: {}mV, {}mA, {}mW, {} (requested {}mV)", 
+                best_pdo.pdo_index, best_pdo.voltage_mv, best_pdo.current_ma, 
+                best_pdo.max_power_mw, 
+                if best_pdo.is_fixed { "Fixed" } else { "Variable" }, 
+                voltage_mv);
             
-            // Map to nearest standard PDVoltage
-            let pd_voltage = if best_pdo.voltage_mv <= 6500 {
-                PDVoltage::V5
-            } else if best_pdo.voltage_mv <= 10500 {
-                PDVoltage::V9
-            } else if best_pdo.voltage_mv <= 13500 {
-                PDVoltage::V12
-            } else if best_pdo.voltage_mv <= 17500 {
-                PDVoltage::V15
-            } else if best_pdo.voltage_mv <= 24000 {
-                PDVoltage::V20
-            } else if best_pdo.voltage_mv <= 32000 {
-                PDVoltage::V28
-            } else if best_pdo.voltage_mv <= 38000 {
-                PDVoltage::V36
-            } else if best_pdo.voltage_mv <= 44000 {
-                PDVoltage::V40
+            if !best_pdo.is_fixed {
+                // For Variable PDO, use the generic driver's custom voltage request directly
+                info!("Using Variable PDO - requesting exact voltage {}mV", voltage_mv);
+                let mut i2c_wrapper = I2cWrapper::new(i2cdrv);
+                let mut delay = StdDelay;
+                
+                match self.driver.request_custom_voltage(&mut i2c_wrapper, &mut delay, voltage_mv, _current_ma) {
+                    Ok(()) => {
+                        info!("Custom voltage request successful");
+                        Ok(())
+                    },
+                    Err(e) => {
+                        error!("Custom voltage request failed: {:?}", e);
+                        Err(anyhow::anyhow!("Custom voltage request failed"))
+                    }
+                }
             } else {
-                PDVoltage::V48
-            };
-            
-            info!("Mapped {}mV to {:?}", best_pdo.voltage_mv, pd_voltage);
-            self.request_voltage(i2cdrv, pd_voltage)
+                // For Fixed PDO, map to nearest standard PDVoltage
+                info!("Using Fixed PDO - mapping to standard voltage");
+                let pd_voltage = if best_pdo.voltage_mv <= 6500 {
+                    PDVoltage::V5
+                } else if best_pdo.voltage_mv <= 10500 {
+                    PDVoltage::V9
+                } else if best_pdo.voltage_mv <= 13500 {
+                    PDVoltage::V12
+                } else if best_pdo.voltage_mv <= 17500 {
+                    PDVoltage::V15
+                } else if best_pdo.voltage_mv <= 24000 {
+                    PDVoltage::V20
+                } else if best_pdo.voltage_mv <= 32000 {
+                    PDVoltage::V28
+                } else if best_pdo.voltage_mv <= 38000 {
+                    PDVoltage::V36
+                } else if best_pdo.voltage_mv <= 44000 {
+                    PDVoltage::V40
+                } else {
+                    PDVoltage::V48
+                };
+                
+                info!("Mapped {}mV to {:?}", best_pdo.voltage_mv, pd_voltage);
+                self.request_voltage(i2cdrv, pd_voltage)
+            }
         } else {
             error!("No suitable PDO found for voltage {}mV", voltage_mv);
             Err(anyhow::anyhow!("No suitable PDO found for requested voltage"))

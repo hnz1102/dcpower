@@ -18,6 +18,7 @@ use esp_idf_hal::ledc::LedcTimerDriver;
 use esp_idf_hal::ledc::LedcDriver;
 use esp_idf_svc::sntp::{EspSntp, SyncStatus, SntpConf, OperatingMode, SyncMode};
 use esp_idf_svc::wifi::EspWifi;
+use esp_idf_svc::nvs::*;
 use chrono::{DateTime, Utc};
 
 mod displayctl;
@@ -78,6 +79,45 @@ pub struct Config {
     syslog_server: &'static str,
     #[default("")]
     syslog_enable: &'static str,
+}
+
+// NVS key for storing the last voltage setting
+const NVS_NAMESPACE: &str = "dcpowerunit";
+const VOLTAGE_KEY: &str = "last_voltage";
+
+// Function to save voltage setting to NVS
+fn save_voltage_to_nvs(voltage: f32) -> anyhow::Result<()> {
+    let nvs_default_partition = EspDefaultNvsPartition::take()?;
+    let mut nvs = EspNvs::new(nvs_default_partition, NVS_NAMESPACE, true)?;
+    
+    // Convert f32 to bytes for storage
+    let voltage_bytes = voltage.to_le_bytes();
+    nvs.set_blob(VOLTAGE_KEY, &voltage_bytes)?;
+    info!("Voltage {:.3}V saved to NVS", voltage);
+    Ok(())
+}
+
+// Function to load voltage setting from NVS
+fn load_voltage_from_nvs() -> anyhow::Result<f32> {
+    let nvs_default_partition = EspDefaultNvsPartition::take()?;
+    let nvs = EspNvs::new(nvs_default_partition, NVS_NAMESPACE, false)?;
+    
+    let mut voltage_bytes = [0u8; 4];
+    match nvs.get_blob(VOLTAGE_KEY, &mut voltage_bytes) {
+        Ok(Some(_)) => {
+            let voltage = f32::from_le_bytes(voltage_bytes);
+            info!("Voltage {:.3}V loaded from NVS", voltage);
+            Ok(voltage)
+        },
+        Ok(None) => {
+            info!("No voltage setting found in NVS, using default 0.0V");
+            Ok(0.0)
+        },
+        Err(e) => {
+            info!("Failed to read voltage from NVS: {:?}, using default 0.0V", e);
+            Ok(0.0)
+        }
+    }
 }
 
 fn main() -> anyhow::Result<()> {
@@ -374,8 +414,30 @@ fn main() -> anyhow::Result<()> {
     let mut logging_start = false;
     let mut load_start = false;
     let mut calibration_start = false;
-    let mut set_output_voltage = 0.0;
+    
+    // Load last voltage setting from NVS
+    let mut set_output_voltage = match load_voltage_from_nvs() {
+        Ok(voltage) => {
+            // Ensure voltage is within PDO limits
+            if voltage > pdo_max_voltage {
+                info!("Loaded voltage {:.3}V exceeds PDO limit {:.3}V, using limit", voltage, pdo_max_voltage);
+                pdo_max_voltage
+            } else {
+                voltage
+            }
+        },
+        Err(e) => {
+            info!("Failed to load voltage from NVS: {:?}, using 0.0V", e);
+            0.0
+        }
+    };
+    
+    info!("Initial voltage setting: {:.3}V", set_output_voltage);
     let mut previous_set_output_voltage = 0.0;
+    
+    // Set initial voltage display
+    dp.set_output_voltage(set_output_voltage);
+    
     let mut pwm_duty : u32;
     loop {
         thread::sleep(Duration::from_millis(10));
@@ -468,6 +530,12 @@ fn main() -> anyhow::Result<()> {
                 measurement_count = 0;
                 previous_set_output_voltage = 0.0;
                 info!("Logging and Sending Start..");
+                
+                // Save current voltage setting to NVS when starting
+                if let Err(e) = save_voltage_to_nvs(set_output_voltage) {
+                    info!("Failed to save voltage to NVS: {:?}", e);
+                }
+                
                 pid.reset();
                 clogs.clear();
                 dp.enable_display(true);

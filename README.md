@@ -20,7 +20,7 @@ The left image shows the single positive output terminal adopter, and the right 
 
 - **High Power Delivery**: Up to 100W from USB PD Charger
 - **Multiple Voltage Outputs**: 0V to 20V in SPR mode, 0V to 48V in EPR mode (10mV steps)
-- **High Current Support**: Up to 5A when PD Charger supports EPR
+- **High Current Support**: Up to 5A when PD Charger supports EPR, but some chargers support up to 90% of the maximum current.
 - **Touch Control Interface**: Front panel touch switch for voltage selection and output control
 - **Precise Control**: PID controller maintains constant output voltage
 - **High Accuracy Monitoring and Control**: 10mV voltage accuracy using shunt resistor and INA228 current sensor, with 1mV resolution.
@@ -30,6 +30,8 @@ The left image shows the single positive output terminal adopter, and the right 
 - **Safety Features**: Over Voltage Protection (OVP), Under Voltage Protection (UVP), Over Current Protection (OCP). Over Temperature Protection (OTP) does not implemented.
 
 ****Note**: If you use 21V or higher voltage, input voltage is 28v or higher, and differential voltage is over 3V and output current is over 3A, the MOSFET device is in the high consumption state and the unit temperature may rise over 80 degrees Celsius. Please be careful about the temperature. You can set the maximum temperature in the configuration file. The default value is 80 degrees Celsius. If the temperature exceeds the limit, the output will be disabled automatically. I recommend using less than 0.7A current at 21V or higher voltage. Otherwise, if you set the output voltage to 27V or higher, the temperature rise is not a problem.**
+
+****Note**: This unit uses a micro controller and a USB PD controller. These controllers need the power to operate. Therefore, if you use a over current, the power source may be shut down by the over current protection of the PD charger. In this case, This unit cannot operate and will be turned off. Please use the current within the specification of your PD charger.**
 
 ## Hardware Components
 

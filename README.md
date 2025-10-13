@@ -7,7 +7,7 @@
 
 # DC Power Unit for Breadboard
 
-This is a DC Power Unit for Breadboard based on ESP32-S3 microcontroller and AP33772S USB Power Delivery (PD) Sink Controller. It can supply power to the breadboard from USB Power Delivery (PD) Charger with support for both Standard Power Range (SPR) and Extended Power Range (EPR) modes. The output voltage can be controlled from 0v to 20V in SPR mode and up to 48V(*1) in EPR mode with step of 10mV.   
+This is a DC Power Unit for Breadboard based on ESP32-S3 microcontroller and AP33772S USB Power Delivery (PD) Sink Controller. It can supply power to the breadboard from USB Power Delivery (PD) Charger with support for both Standard Power Range (SPR) and Extended Power Range (EPR) modes. The output voltage can be controlled from 0v to 20V in SPR mode and up to 30V(*1) in EPR mode with step of 10mV.   
 There are 2 types of adopters for the output terminal: Single positive power output terminal and dual positive/negative output terminal. It is easy to connect to the breadboard with standard 2.54mm pitch pin header. If you select the dual positive/negative output terminal adopter, the output voltage can be halved by positive and negative voltage. E.g. If you set the output voltage to 20V, you can get +10V and -10V from the positive and negative output terminal.
 
 ***1: Some PD chargers may not support EPR mode or only support up to 16V/5A. Please check your PD charger specifications.**
@@ -19,7 +19,7 @@ The left image shows the single positive output terminal adopter, and the right 
 ## Key Features
 
 - **High Power Delivery**: Up to 100W from USB PD Charger
-- **Multiple Voltage Outputs**: 0V to 20V in SPR mode, 0V to 48V in EPR mode (10mV steps)
+- **Multiple Voltage Outputs**: 0V to 20V in SPR mode, 0V to 30V in EPR mode (10mV steps)
 - **High Current Support**: Up to 5A when PD Charger supports EPR, but some chargers support up to 90% of the maximum current.
 - **Touch Control Interface**: Front panel touch switch for voltage selection and output control
 - **Precise Control**: PID controller maintains constant output voltage

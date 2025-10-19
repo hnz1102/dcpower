@@ -281,14 +281,8 @@ impl AP33772S {
                     PDVoltage::V15
                 } else if best_pdo.voltage_mv <= 24000 {
                     PDVoltage::V20
-                } else if best_pdo.voltage_mv <= 32000 {
-                    PDVoltage::V28
-                } else if best_pdo.voltage_mv <= 38000 {
-                    PDVoltage::V36
-                } else if best_pdo.voltage_mv <= 44000 {
-                    PDVoltage::V40
                 } else {
-                    PDVoltage::V48
+                    PDVoltage::V28
                 };
                 
                 info!("Mapped {}mV to {:?}", best_pdo.voltage_mv, pd_voltage);
@@ -347,9 +341,6 @@ impl AP33772S {
             v if v <= 15.5 => PDVoltage::V15,
             v if v <= 20.5 => PDVoltage::V20,
             v if v <= 28.5 => PDVoltage::V28,
-            v if v <= 36.5 => PDVoltage::V36,
-            v if v <= 40.5 => PDVoltage::V40,
-            v if v <= 48.5 => PDVoltage::V48,
             _ => return Err(anyhow::anyhow!("Voltage {} V out of range", voltage)),
         };
         
